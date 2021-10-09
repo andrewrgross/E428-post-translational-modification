@@ -24,7 +24,7 @@ metadata <- read.csv('metadata.csv', fileEncoding="UTF-8-BOM")
 ### 3 - Format
 
 ### 3.1 - Create new dataframes separating expression and identity data for each modification row
-rowAll  <- ptmAll[1:7]      ; ptmAll <-  ptmAll[8:27]               ; dataset = 'All modifications'
+rowAll  <- ptmAll[1:6]      ; ptmAll <-  ptmAll[7:26]               ; dataset = 'All modifications'
 
 rowLace <- ptmLace[1:6]     ; ptmLace <- ptmLace[7:26]              ; dataset = 'Lysene Acetylation'
 
@@ -38,7 +38,7 @@ rowUnmod <- ptmUnmod[c(1:8)] ; ptmUnmod <-ptmUnmod[9:29]            ; dataset = 
 
 dataContainer <- list(ptmAll, ptmLace, ptmMeth, ptmNace, ptmPhos)
 rowContainer <- list(rowAll, rowLace, rowMeth, rowNace, rowPhos)
-names(dataContainer) <- c('All', 'Lace', 'Meth', 'Nace', 'Phos')
+names(dataContainer) <- c('All Modifications', 'L-Acetylation', 'Methylation', 'N-Acetylation', 'Phosphorylation')
 names(rowContainer) <- names(dataContainer)
 
 #dataContainer <- mapply(log, dataContainer)
@@ -63,23 +63,28 @@ for (ptmTypeNum in 1:length(dataContainer)) {
   
   conditionReport <- data.frame(allCheck = logical(), iecChec = logical(), huvecCheck = logical(), ipscCheck = logical(), iecHuCheck = logical(), iecIpscCheck = logical(), huIpscCheck = logical())
   
+  ### For each row, check if the PTM is listed in all of each cell type
   for(rowNum in 1:nrow(inputDf)) {
-    row = inputDf[rowNum,]
-    ipsc = row[metadata[metadata$Group=='iPSC',]$Shortname]
+    row = inputDf[rowNum,]                                       # Loop through row numbers
+    ### Subset each cell type
+    ipsc = row[metadata[metadata$Group=='iPSC',]$Shortname]      
     iec = row[metadata[metadata$Group=='iEC',]$Shortname]
     huvec = row[metadata[metadata$Group=='Huvecs',]$Shortname]
+    ### Check if all samples in a group have a non-zero value
     allCheck = min(row)       != 0
     iecCheck = min(iec)       != 0
     huvecCheck = min(huvec)   != 0
     ipscCheck = min(ipsc)     != 0
+    ### Check if the row is universally present in multiple groups
     iecHuCheck = as.logical(iecCheck * huvecCheck)
     iecIpscCheck = as.logical(iecCheck * ipscCheck)
     huIpscCheck = as.logical(huvecCheck * ipscCheck)
-    
+    ### Assign the result to the condition report file
     conditionReport = rbind(conditionReport,data.frame(allCheck, iecCheck, huvecCheck, ipscCheck, iecHuCheck, iecIpscCheck, huIpscCheck))
   }
   
   newConditionData <- data.frame(t(apply(conditionReport,2,sum)), row.names = ptmType)
+  ### Subtract out co-occurring rows from the groups themselves to make those exclusive
   newConditionData[2:7] = newConditionData[2:7]-newConditionData$allCheck
   newConditionData$iecCheck = newConditionData$iecCheck - newConditionData$iecHuCheck - newConditionData$iecIpscCheck
   newConditionData$huvecCheck = newConditionData$huvecCheck - newConditionData$iecHuCheck - newConditionData$huIpscCheck
@@ -94,14 +99,16 @@ for (ptmTypeNum in 1:length(dataContainer)) {
 ############################################################################################
 ### 5.1 - Review the summary of each dF
 
-(ptmType = names(dataContainer)[1])
-
+(ptmType = names(dataContainer)[5])
 
 group = c(rep('iEC',4), rep('HUVEC',4), rep('iPSC',4))
 shared = c('iEC','iEC & HUVEC','iEC & iPSC', 'All', 'HUVEC', 'iEC & HUVEC','HUVEC & iPSC', 'All', 'iPSC', 'iEC & iPSC', 'HUVEC & iPSC', 'All' )
 value = ptmCountsByCondition[ptmType, , drop(FALSE)]
 value = c(value['iecCheck'][[1]], value['iecHuCheck'][[1]], value['iecIpscCheck'][[1]], value['allCheck'][[1]], value['huvecCheck'][[1]], value['iecHuCheck'][[1]], value['huIpscCheck'][[1]], value['allCheck'][[1]], value['ipscCheck'][[1]], value['iecIpscCheck'][[1]], value['huIpscCheck'][[1]], value['allCheck'][[1]]  )
-ptmCountsToPlot = data.frame(group, shared, value)
+text = rep(NA, 12)
+cutoff = round(max(value)/10)
+text[value>cutoff] <- value[value>cutoff]
+ptmCountsToPlot = data.frame(group, shared, value, text)
 
 valueSummed = c(ptmCountsToPlot$value[1] + ptmCountsToPlot$value[2]+ptmCountsToPlot$value[3]+ptmCountsToPlot$value[4], 
                 ptmCountsToPlot$value[5] + ptmCountsToPlot$value[6]+ptmCountsToPlot$value[7]+ptmCountsToPlot$value[8], 
@@ -113,28 +120,7 @@ ptmCountsToPlot2$group <- factor(c('iEC', 'HUVEC', 'iPSC'), levels = c('iEC', 'H
 
 ggplot(data = ptmCountsToPlot, aes(x = group, y = value, fill = shared)) +
   geom_bar(position = 'stack', stat = 'identity') + 
-  scale_fill_manual(values=c("#37d51e", "#1e37d5", "#d51e37", "#1e93d5", "#d5bc1e", "#d51e93", "#e3e3e3"), labels = c('iEC only', 'HUVEC only', 'iPSC only', 'iEC & HUVEC', 'iEC & iPSC', 'HUVEC & iPSC', 'Found in all')) +
-  geom_bar(data = ptmCountsToPlot2, aes(x = group, y = value, color = group), fill = NA, position = 'stack', stat = 'identity', size = 1) + 
-  scale_color_manual(values=c("#37d51e", "#1e37d5", "#d51e37"), guide = FALSE) + 
-  #scale_y_continuous(breaks = seq(0,50,5), limits = c(0,45.1), expand = c(0,0)) +
-  labs(title = ptmType,
-       x = 'Cell Type', 
-       y = 'PTMs Detected',
-       fill = 'Overlap') +
-  theme(plot.title = element_text(size = 24,hjust = 0.5),
-        axis.title.x = element_text(face="bold", size=14, margin =margin(10,0,0,0)),
-        axis.title.y = element_text(face="bold", size=14, margin =margin(0,10,0,0)),
-        axis.text.x = element_text(face="italic", size = 14),
-        axis.text.y = element_text(size = 14),
-        panel.background = element_rect(fill = 'white', color = 'white', size = 1),
-        panel.grid = element_blank(),
-        axis.line = element_line(size = 1),
-        axis.ticks = element_line(size = 2))
-
-
-
-ggplot(data = ptmCountsToPlot, aes(x = group, y = value, fill = shared)) +
-  geom_bar(position = 'stack', stat = 'identity') + 
+  geom_text(aes(x = group, y = value, label = text), color = 'White', size = 8, position = position_stack(vjust = 0.5)) +
   geom_bar(data = ptmCountsToPlot2, aes(x = group, y = value), color = 'Black', fill = NA, position = 'stack', stat = 'identity', size = 1.1) + 
   scale_fill_manual(values=c("#37d51e", "#1e37d5", "#d51e37", "#1e93d5", "#d5bc1e", "#d51e93", "#e3e3e3"), labels = c('iEC only', 'HUVEC only', 'iPSC only', 'iEC & HUVEC', 'iEC & iPSC', 'HUVEC & iPSC', 'Found in all')) +
   #scale_y_continuous(breaks = seq(0,50,5), limits = c(0,45.1), expand = c(0,0)) +
@@ -154,11 +140,120 @@ ggplot(data = ptmCountsToPlot, aes(x = group, y = value, fill = shared)) +
 
 
 
+####################################################################################################################################################
+### 6 - Save PTMs to group lists
+############################################################################################
+### 6.1 - Define group lists
+ptmCountsByCondition
+
+allList = c() ; allListM = c()
+iecList = c() ; iecListM = c()
+huvList = c() ; huvListM = c()
+ipsList = c() ; ipsListM = c() 
+iechuvL = c() ; iechuvLM = c()
+iecipsL = c() ; iecipsLM = c()
+huvipsL = c() ; huvipsLM = c()
+
+### 6.2 - Call data based on PTM group
+
+ptmTypeNum = 5
+(ptmType <- names(dataContainer)[ptmTypeNum])
+inputDf <- dataContainer[[ptmTypeNum]]
+proteins = rowContainer[[ptmTypeNum]]$Gene
+mods =  rowContainer[[ptmTypeNum]]$Modified.Sequence
+
+conditionReport <- data.frame(allCheck = logical(), iecChec = logical(), huvecCheck = logical(), ipscCheck = logical(), iecHuCheck = logical(), iecIpscCheck = logical(), huIpscCheck = logical())
+### 6.3 - For each row, check if the PTM is listed in all of each cell type
+for(rowNum in 1:nrow(inputDf)) {
+  row = inputDf[rowNum,]                                       # Loop through row numbers
+  ### Subset each cell type
+  ipsc = row[metadata[metadata$Group=='iPSC',]$Shortname]      
+  iec = row[metadata[metadata$Group=='iEC',]$Shortname]
+  huvec = row[metadata[metadata$Group=='Huvecs',]$Shortname]
+  ### Check if all samples in a group have a non-zero value
+  allCheck = min(row)       != 0
+  iecCheck = min(iec)       != 0
+  huvecCheck = min(huvec)   != 0
+  ipscCheck = min(ipsc)     != 0
+  ### Check if the row is universally present in multiple groups
+  iecHuCheck = as.logical(iecCheck * huvecCheck)
+  iecIpscCheck = as.logical(iecCheck * ipscCheck)
+  huIpscCheck = as.logical(huvecCheck * ipscCheck)
+  conditionReport = rbind(conditionReport,data.frame(allCheck, iecCheck, huvecCheck, ipscCheck, iecHuCheck, iecIpscCheck, huIpscCheck))
+  ### Add protein to appropriate list and skip others
+  if(allCheck){                                             # If all check is true, add to allList
+    allList = c(allList, proteins[rowNum]) ; allListM = c(allListM, mods[rowNum]) 
+  } else if(iecHuCheck) {                             # If iecHuCheck is true add to iechuvL
+    iechuvL = c(iechuvL, proteins[rowNum]) ; iechuvLM = c(iechuvLM, mods[rowNum])
+  } else if(iecIpscCheck) {                          # If iecIpscCheck is true add to iecipsL 
+    iecipsL = c(iecipsL, proteins[rowNum]) ; iecipsLM = c(iecipsLM, mods[rowNum])
+  } else if(huIpscCheck) {                           # If huIpscCheck is tru add to huvipsL
+    huvipsL = c(huvipsL, proteins[rowNum]) ; huvipsLM = c(huvipsLM, mods[rowNum])
+  } else if(iecCheck) {                        # If iecCheck is true add to iecList
+    #print(paste('iEC:', proteins[rowNum]))
+    iecList = c(iecList, proteins[rowNum]) ; iecListM = c(iecListM, mods[rowNum])
+  } else if(huvecCheck) {                      # If huvecCheck is true add to huvList
+    #print(paste('HUVEC:', proteins[rowNum]))
+    huvList = c(huvList, proteins[rowNum]) ; huvListM = c(huvListM, mods[rowNum])
+  } else if(ipscCheck) {                       # If ipscCheck is true add ipsList
+    #print(paste('iPSC:', proteins[rowNum]))
+    ipsList = c(ipsList, proteins[rowNum]) ; ipsListM = c(ipsListM, mods[rowNum])
+  }
+}
+masterList = list('All Cell Types' = allList,'iECs' = iecList, 'HUVECs' = huvList, 'iPSCs' = ipsList, 'Endotheial (iECs+HUVECs)' = iechuvL, 'Induced (iECs+iPSCs)' = iecipsL, 'HUVECs+iPSCs' = huvipsL)
+modsList = list('All Cell Types' = allListM,'iECs' = iecListM, 'HUVECs' = huvListM, 'iPSCs' = ipsListM, 'Endotheial (iECs+HUVECs)' = iechuvLM, 'Induced (iECs+iPSCs)' = iecipsLM, 'HUVECs+iPSCs' = huvipsLM)
+
+### 6.4 - Find the longest list
+maxListLength = 0
+for(list in masterList){
+  print(length(list))
+  maxListLength = max(maxListLength, length(list))
+}
+
+### 6.5 - Create an emtpy matrix to write to
+outputMatrix <- matrix('', ncol = 14, nrow = maxListLength)
+colnames(outputMatrix) <- c('All Cell Types - Protein', 'All - Mod', 'iECs - Protein', 'iECs - Mod', 'HUVECs - Protein', 'HUVECs - Mod', 'iPSCs - Protein', 'iPSC - Mod', 'iECs+HUVECs - Protein', 'iEC+HUVECs - Mod', 'iECs+iPSCs - Protein', 'iEC+iPSCs - Mod', 'HUVECs+iPSCs - Protein', 'HUVECs+iPSCs - Mod')
+
+### 6.6 - Assign each list to a column
+for(listNum in 1:length(masterList)){
+  selectedList = masterList[[listNum]]
+  selectedListM = modsList[[listNum]]
+  #outputMatrix[,listNum][1:length(selectedList)] <- selectedList
+  assignmentPos = listNum*2-1
+  outputMatrix[0:length(selectedList),assignmentPos] <- selectedList
+  outputMatrix[0:length(selectedListM),assignmentPos+1] <- selectedListM
+}
 
 
-ggplot(data = ptmCountsToPlot2, aes(x = group, y = value, color = group)) +
-  geom_bar(data = ptmCountsToPlot2, aes(x = group, y = value, color = group), position = 'stack', stat = 'identity', size = 2) + 
-  scale_fill_manual(values=c("#37d51e", "#1e37d5", "#d51e37"))
+setwd('C:/Users/grossar/Box/Sareen Lab Shared/Data/Andrew/E428 - PTM of iECs/Counts/')
+write.csv(outputMatrix, paste(ptmType,'-PTMs found.csv'), row.names = FALSE)
+
+
+
+
+
+length(allList)
+length(iecList)
+length(huvList)
+length(ipsList)
+length(iechuvL)
+length(iecipsL)
+length(huvipsL)
+
+
+
+test <- data.frame('all' = allList, 'iec' = rep(0,103), 'huvec' = rep(0,103))
+test$iec = iecList
+
+####################################################################################################################################################
+### 5 - Generate Bar Graphs
+############################################################################################
+### 5.1 - Review the summary of each dF
+
+
+
+
+
 
 
 
