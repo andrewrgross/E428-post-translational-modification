@@ -25,15 +25,10 @@ metadata <- read.csv('metadata.csv', fileEncoding="UTF-8-BOM")
 
 ### 3.1 - Create new dataframes separating expression and identity data for each modification row
 rowAll  <- ptmAll[1:6]      ; ptmAll <-  ptmAll[7:26]               ; dataset = 'All modifications'
-
 rowLace <- ptmLace[1:6]     ; ptmLace <- ptmLace[7:26]              ; dataset = 'Lysene Acetylation'
-
 rowMeth <- ptmMeth[1:6]     ; ptmMeth <- ptmMeth[7:26]              ; dataset = 'Methylation'
-
 rowNace <- ptmNace[1:6]     ; ptmNace <- ptmNace[7:26]              ; dataset = 'N-terminal Aceytlation'
-
 rowPhos <- ptmPhos[1:6]     ; ptmPhos <- ptmPhos[7:26]              ; dataset = 'Phosphorylation'
-
 rowUnmod <- ptmUnmod[c(1:8)] ; ptmUnmod <-ptmUnmod[9:29]            ; dataset = 'Unmodified'
 
 dataContainer <- list(ptmAll, ptmLace, ptmMeth, ptmNace, ptmPhos)

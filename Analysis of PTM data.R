@@ -7,6 +7,13 @@
 ### 1 - Header
 library("DESeq2")
 
+### 1.2 - Functions
+####### 1.2.1 - filterIncompleteRows - Remove rows which don't have universal rexpression in iECs
+filterIncompleteRows <- function(dataframe){
+  iecMinimums <- apply(dataframe[metadata$Shortname[metadata$iEC=='iEC']],1,min)
+  dataframe <- dataframe[!is.na(iecMinimums),]
+  return(dataframe)
+}
 
 ####################################################################################################################################################
 ### 2 - Input
@@ -24,6 +31,25 @@ metadata <- read.csv('metadata.csv', fileEncoding="UTF-8-BOM")
 ####################################################################################################################################################
 ### 3 - Format
 
+### 3.1 - Create new dataframes separating expression and identity data for each modification row
+rowAll  <- ptmAll[1:6]      ; ptmAll <-  ptmAll[7:26]               ; dataset = 'All modifications'
+rowLace <- ptmLace[1:6]     ; ptmLace <- ptmLace[7:26]              ; dataset = 'Lysene Acetylation'
+rowMeth <- ptmMeth[1:6]     ; ptmMeth <- ptmMeth[7:26]              ; dataset = 'Methylation'
+rowNace <- ptmNace[1:6]     ; ptmNace <- ptmNace[7:26]              ; dataset = 'N-terminal Aceytlation'
+rowPhos <- ptmPhos[1:6]     ; ptmPhos <- ptmPhos[7:26]              ; dataset = 'Phosphorylation'
+rowUnmod <- ptmUnmod[c(1:8)] ; ptmUnmod <-ptmUnmod[9:29]            ; dataset = 'Unmodified'
+names(ptmAll) <- names(ptmLace) <- names(ptmMeth) <- names(ptmNace) <- names(ptmPhos) <-  metadata$Shortname
+
+dataContainer <- list(ptmAll, ptmLace, ptmMeth, ptmNace, ptmPhos)
+rowContainer <- list(rowAll, rowLace, rowMeth, rowNace, rowPhos)
+names(dataContainer) <- c('All Modifications', 'L-Acetylation', 'Methylation', 'N-Acetylation', 'Phosphorylation')
+names(rowContainer) <- names(dataContainer)
+
+#dataContainer <- mapply(log, dataContainer)
+
+
+
+"
 ### 3.1 - Create new dataframes separating expression and identity data for each modification row
 ptmData <- ptmAll                     ; dataset = 'All modifications'
 rowData <- ptmData[1:7]
@@ -45,20 +71,37 @@ ptmData[is.na(ptmData)] = 0
 ptmData <- round(ptmData,0)
 
 names(ptmData) <- metadata$Shortname
+"
 
-### 3.2 - Format for DESeq
 
+### 3.2 - Filter out any rows in which iECs aren't expressed in all samples
+
+for(pos in 1:length(dataContainer)) {
+  dataContainer[[pos]] <- filterIncompleteRows(dataContainer[[pos]])
+  dataContainer[[pos]] <- round(log(dataContainer[[pos]] + 1)*1000,0)
+  dataContainer[[pos]][is.na(dataContainer[[pos]])] = 0
+  names(dataContainer[[pos]]) <- metadata$Shortname
+}
+
+
+### 3.3 - Format for DESeq
 ### iEC + HUVEC vs iPSC
 (columns1   <- data.frame(row.names = metadata$Shortname, condition = metadata$CellType))   # EC vs iPSC
-(columns2   <- data.frame(row.names = metadata$Shortname, condition = metadata$Group)[9:20, , drop = FALSE])   # iEC vs HUVEC
+
+### iEC vs HUVEC & iPSC
+(columns2   <- data.frame(row.names = metadata$Shortname, condition = metadata$iEC))   # iEC vs HUVEC + iPSC
+#(columns2   <- data.frame(row.names = metadata$Shortname, condition = metadata$Group)[9:20, , drop = FALSE])   # iEC vs HUVEC
 #(columns3   <- data.frame(row.names = metadata$ShortName, condition = metadata$Group)[1:14, , drop = FALSE])
 #(columnData.test     <- data.frame(row.names = metadata.data$Shortname, condition = c('rand0', 'rand1', 'rand0', 'rand1', 'rand1', 'rand0', 'rand1', 'rand0', 'rand1', 'rand1', 'rand0', 'rand1'))[1:6, , drop = FALSE])
-
 
 ####################################################################################################################################################
 ### 4 - Differential Expression
 ############################################################################################
 ### Make our DESeq data sets
+ptmTypeNum = 2
+(ptmType <- names(dataContainer)[ptmTypeNum])
+ptmData <- dataContainer[[ptmTypeNum]]
+
 
 dds1 <- DESeqDataSetFromMatrix(countData = as.matrix(ptmData), colData = columns1, design = ~ condition) ; title1 = 'EC vs iPSC'
 dds2 <- DESeqDataSetFromMatrix(countData = as.matrix(ptmData[row.names(columns2)]), colData = columns2, design = ~ condition) ; title2 = 'iEC vs HUVEC'
@@ -76,6 +119,10 @@ results2 <- as.data.frame(results(dds2))
 ### 5 - Analysis
 ############################################################################################
 ### 5.1 - Rejoin the identity info for each row
+
+for(pos in 1:length(dataContainer)) {
+
+}
 
 results1 <- cbind(rowData[1:2], rowData[4:6], results1, ptmData, rowData[3])
 results2 <- cbind(rowData[1:2], rowData[4:6], results2, ptmData, rowData[3])
