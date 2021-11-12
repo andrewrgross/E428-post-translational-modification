@@ -81,6 +81,11 @@ ptmNace <- read.csv('PTM-N-term-acetylation.csv', fileEncoding="UTF-8-BOM")
 ptmPhos <- read.csv('PTM-phosphorylation.csv', fileEncoding="UTF-8-BOM")
 ptmUnmod <- read.csv('PTM-unmodified.csv', fileEncoding="UTF-8-BOM")
 
+ptmLace <- read.csv('PTM-Lace-norm.csv', fileEncoding="UTF-8-BOM")
+ptmMeth <- read.csv('PTM-Meth-norm.csv', fileEncoding="UTF-8-BOM")
+ptmNace <- read.csv('PTM-Nace-norm.csv', fileEncoding="UTF-8-BOM")
+ptmPhos <- read.csv('PTM-Phos-norm.csv', fileEncoding="UTF-8-BOM")
+
 ####### 2.2 - Import metadata
 metadata <- read.csv('metadata.csv', fileEncoding="UTF-8-BOM")
 
@@ -90,18 +95,18 @@ ecList <- read.csv('Endothelial-Associated Genes/iec-gene-master-list2.csv', fil
 
 ####################################################################################################################################################
 ### 3 - Format
-
+brk = 4
 ####### 3.1 - Create new dataframes separating expression and identity data for each modification row
-rowAll  <- ptmAll[1:6]      ; ptmAll <-  ptmAll[7:26]               ; dataset = 'All modifications'
-rowLace <- ptmLace[1:6]     ; ptmLace <- ptmLace[7:26]              ; dataset = 'Lysene Acetylation'
-rowMeth <- ptmMeth[1:6]     ; ptmMeth <- ptmMeth[7:26]              ; dataset = 'Methylation'
-rowNace <- ptmNace[1:6]     ; ptmNace <- ptmNace[7:26]              ; dataset = 'N-terminal Aceytlation'
-rowPhos <- ptmPhos[1:6]     ; ptmPhos <- ptmPhos[7:26]              ; dataset = 'Phosphorylation'
-rowUnmod <- ptmUnmod[c(1:8)] ; ptmUnmod <-ptmUnmod[9:29]            ; dataset = 'Unmodified'
+#rowAll  <- ptmAll[1:brk]      ; ptmAll <-  ptmAll[brk+1:26]               ; dataset = 'All modifications'
+rowLace <- ptmLace[1:brk]     ; ptmLace <- ptmLace[(brk+1):(brk+20)]              ; dataset = 'Lysene Acetylation'
+rowMeth <- ptmMeth[1:brk]     ; ptmMeth <- ptmMeth[(brk+1):(brk+20)]              ; dataset = 'Methylation'
+rowNace <- ptmNace[1:brk]     ; ptmNace <- ptmNace[(brk+1):(brk+20)]              ; dataset = 'N-terminal Aceytlation'
+rowPhos <- ptmPhos[1:brk]     ; ptmPhos <- ptmPhos[(brk+1):(brk+20)]              ; dataset = 'Phosphorylation'
+#rowUnmod <- ptmUnmod[c(1:8)] ; ptmUnmod <-ptmUnmod[9:29]            ; dataset = 'Unmodified'
 
-dataContainer <- list(ptmAll, ptmLace, ptmMeth, ptmNace, ptmPhos)
-rowContainer <- list(rowAll, rowLace, rowMeth, rowNace, rowPhos)
-names(dataContainer) <- c('All Modifications', 'L-Acetylation', 'Methylation', 'N-Acetylation', 'Phosphorylation')
+dataContainer <- list(ptmLace, ptmMeth, ptmNace, ptmPhos)
+rowContainer <- list(rowLace, rowMeth, rowNace, rowPhos)
+names(dataContainer) <- c('L-Acetylation', 'Methylation', 'N-Acetylation', 'Phosphorylation')
 names(rowContainer) <- names(dataContainer)
 
 #dataContainer <- mapply(log, dataContainer)
@@ -205,7 +210,7 @@ for (ptmTypeNum in 1:length(dataContainer)) {
   #print(plot)
   #dev.off()
 }
-plotList = plotList[2:5]
+#plotList = plotList[2:5]
 
 plotList[[5]] = get_legend(ggplot(data = ptmCountsToPlot, aes(x = group, y = value, fill = shared)) +
                                               geom_bar(position = 'stack', stat = 'identity') + 
