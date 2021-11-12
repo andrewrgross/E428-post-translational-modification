@@ -5,7 +5,24 @@
 ### OUTPUT: A counts table of the number of PTMs consistently found in each group
 ####################################################################################################################################################
 ### 1 - Header
+####### 1.1 - Libraries
 library(ggplot2)
+
+####### 1.2 - Functions
+########### 1.2.1 - countCheck - Checks whether the items in the specified columns of each row of a dataframe are present or absent above a cutoff
+countCheck <- function(dataframe,columns,cutoffNumber){
+  rowCheck = c()
+  for(rowNum in 1:nrow(dataframe)){
+    row = dataframe[rowNum,]
+    trues = as.numeric(row[columns]>0)
+    if(sum(trues)>=cutoffNumber){
+      rowCheck = c(rowCheck,TRUE)
+    } else{
+      rowCheck = c(rowCheck,FALSE)
+    }
+  }
+  return(rowCheck)
+}
 
 ####################################################################################################################################################
 ### 2 - Input
@@ -44,6 +61,9 @@ for(pos in 1:length(dataContainer)) {
   names(dataContainer[[pos]]) <- metadata$Shortname
 }
 
+
+
+test <- countCheck(inputDf, columns= 1:8, cutoffNumber = 7)
 ####################################################################################################################################################
 ### 4 - Subset data tables to count based on presence in the specified condition
 ############################################################################################
@@ -58,6 +78,14 @@ for (ptmTypeNum in 1:length(dataContainer)) {
   
   conditionReport <- data.frame(allCheck = logical(), iecChec = logical(), huvecCheck = logical(), ipscCheck = logical(), iecHuCheck = logical(), iecIpscCheck = logical(), huIpscCheck = logical())
   
+  inputDf$iecCheck = countCheck(inputDf,columns = which(metadata$Group=='iEC'), cutoffNumber = 8)
+  inputDf$ipsCheck = countCheck(inputDf,columns = which(metadata$Group=='iPSC'), cutoffNumber = 7)
+  inputDf$huvCheck = countCheck(inputDf,columns = which(metadata$Group=='Huvecs'), cutoffNumber = 3)
+  inputDf$allCheck = as.logical(inputDf$iecCheck * inputDf$ipsCheck * inputDf$huvCheck)
+  inputDf$iecHuCheck   = as.logical(inputDf$iecCheck * inputDf$huvCheck)
+  inputDf$iecIpscCheck = as.logical(inputDf$iecCheck * inputDf$ipsCheck)
+  inputDf$huIpscCheck  = as.logical(inputDf$ipsCheck * inputDf$huvCheck)
+  
   ### For each row, check if the PTM is listed in all of each cell type
   for(rowNum in 1:nrow(inputDf)) {
     row = inputDf[rowNum,]                                       # Loop through row numbers
@@ -66,8 +94,9 @@ for (ptmTypeNum in 1:length(dataContainer)) {
     iec = row[metadata[metadata$Group=='iEC',]$Shortname]
     huvec = row[metadata[metadata$Group=='Huvecs',]$Shortname]
     ### Check if all samples in a group have a non-zero value
+    
     allCheck = min(row)       != 0
-    iecCheck = min(iec)       != 0
+    iecCheck = countCheck(iec)
     huvecCheck = min(huvec)   != 0
     ipscCheck = min(ipsc)     != 0
     ### Check if the row is universally present in multiple groups
